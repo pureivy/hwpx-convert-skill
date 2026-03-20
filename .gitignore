@@ -1,0 +1,5 @@
+hwpx_env/
+__pycache__/
+*.pyc
+output/
+.DS_Store

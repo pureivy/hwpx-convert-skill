@@ -86,6 +86,7 @@ python3 <skill-scripts-dir>/preprocess.py INPUT_FILE.md /tmp/hwpx_cleaned.md
 The preprocessor handles:
 - □/○ → Markdown list conversion (most important, must run first)
 - Special characters (■—「」★☆×→·) → ASCII equivalents
+- Quoted text ("text", 'text') → Unicode curly quotes (prevents text loss)
 - Empty table cells → filled with **-** (prevents Hancom crashes)
 - **key**: value patterns → blank line insertion for paragraph separation
 - List items after paragraphs → blank line insertion
@@ -158,6 +159,7 @@ These patterns cause Hancom to crash or produce corrupted files. The preprocesso
 | 4 | URLs with `&` | "Damaged file" error | Run fix_xml.py post-processor |
 | 5 | Consecutive `**key**: value` lines | Lines merged into one | Insert blank lines between them |
 | 6 | List after paragraph (no blank line) | List merged with paragraph | Insert blank line before list |
+| 7 | Quoted text `"text"` or `'text'` | Text inside quotes disappears | Convert to Unicode curly quotes (auto) |
 
 ## Output Name Rules
 

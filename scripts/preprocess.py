@@ -40,6 +40,13 @@ def preprocess_markdown(content):
     content = content.replace('×', 'x')
     content = content.replace('「', '"').replace('」', '"')
 
+    # 1b. Smart-quote prevention: convert ASCII quotes to Unicode curly quotes
+    #     Pandoc's smart extension converts "text" into Quoted AST nodes,
+    #     but pypandoc-hwpx drops Quoted nodes. Unicode curly quotes are
+    #     treated as literal Str nodes, preserving the text.
+    content = re.sub(r'"([^"\n]+)"', '\u201C\\1\u201D', content)
+    content = re.sub(r"(?<![a-zA-Z])'([^'\n]+)'", '\u2018\\1\u2019', content)
+
     # 2. ★☆ rating → numeric
     content = re.sub(r'★{5}', '5/5', content)
     content = re.sub(r'★{4}☆', '4/5', content)

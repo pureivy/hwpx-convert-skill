@@ -23,11 +23,46 @@ import re
 import unicodedata
 
 
+def _extract_protected_blocks(content):
+    """Extract YAML frontmatter and fenced code blocks, replacing with placeholders.
+    Returns (modified_content, list_of_blocks)."""
+    blocks = []
+
+    # 1. Extract YAML frontmatter
+    if content.startswith('---'):
+        fm_end = content.find('\n---', 3)
+        if fm_end > 0:
+            fm_end += 4  # include closing ---\n
+            placeholder = f'\x00BLOCK{len(blocks)}\x00'
+            blocks.append(content[:fm_end])
+            content = placeholder + content[fm_end:]
+
+    # 2. Extract fenced code blocks (```...```)
+    def replace_code_block(match):
+        placeholder = f'\x00BLOCK{len(blocks)}\x00'
+        blocks.append(match.group(0))
+        return placeholder
+    content = re.sub(r'```[^\n]*\n.*?\n```', replace_code_block,
+                     content, flags=re.DOTALL)
+
+    return content, blocks
+
+
+def _restore_protected_blocks(content, blocks):
+    """Restore protected blocks from placeholders."""
+    for i, block in enumerate(blocks):
+        content = content.replace(f'\x00BLOCK{i}\x00', block)
+    return content
+
+
 def preprocess_markdown(content):
     """
     Apply all preprocessing steps to Markdown content.
     Returns cleaned content string.
     """
+    # Protect YAML frontmatter and code blocks from preprocessing
+    content, protected = _extract_protected_blocks(content)
+
     # 0. □/○ → Markdown list conversion (must run first!)
     content = re.sub(r'^ {0,2}□\s*', '- ', content, flags=re.MULTILINE)
     content = re.sub(r'^ {2,4}○\s*', '  - ', content, flags=re.MULTILINE)
@@ -44,22 +79,8 @@ def preprocess_markdown(content):
     #     Pandoc's smart extension converts "text" into Quoted AST nodes,
     #     but pypandoc-hwpx drops Quoted nodes. Unicode curly quotes are
     #     treated as literal Str nodes, preserving the text.
-    #     Skip YAML frontmatter (--- delimited) to avoid breaking YAML strings.
-    if content.startswith('---'):
-        fm_end = content.find('\n---', 3)
-        if fm_end > 0:
-            fm_end += 4  # include closing ---\n
-            frontmatter = content[:fm_end]
-            body = content[fm_end:]
-        else:
-            frontmatter = ''
-            body = content
-    else:
-        frontmatter = ''
-        body = content
-    body = re.sub(r'"([^"\n]+)"', '\u201C\\1\u201D', body)
-    body = re.sub(r"(?<![a-zA-Z])'([^'\n]+)'", '\u2018\\1\u2019', body)
-    content = frontmatter + body
+    content = re.sub(r'"([^"\n]+)"', '\u201C\\1\u201D', content)
+    content = re.sub(r"(?<![a-zA-Z])'([^'\n]+)'", '\u2018\\1\u2019', content)
 
     # 2. ★☆ rating → numeric
     content = re.sub(r'★{5}', '5/5', content)
@@ -118,6 +139,9 @@ def preprocess_markdown(content):
 
     # 7. NFC normalization
     content = unicodedata.normalize('NFC', content)
+
+    # Restore protected blocks (YAML frontmatter, code blocks)
+    content = _restore_protected_blocks(content, protected)
 
     return content
 

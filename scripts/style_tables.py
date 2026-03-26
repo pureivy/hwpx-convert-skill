@@ -712,25 +712,9 @@ def center_table_headers(hwpx_path, output_path=None,
             update_table, section_xml, flags=re.DOTALL
         )
 
-        # ── 4b. Remove [Figure N] captions ────────────────────────
-        #   Text may be split across multiple runs, so join all <hp:t>
-        fig_count = 0
-
-        def remove_figure_para(match):
-            nonlocal fig_count
-            para = match.group(0)
-            texts = re.findall(r'<hp:t>(.*?)</hp:t>', para)
-            full = ''.join(texts).strip()
-            if re.match(r'^\[?Figure \d+\]?\s*$', full):
-                fig_count += 1
-                return ''
-            return para
-
-        section_xml = re.sub(
-            r'<hp:p\b[^>]*>.*?</hp:p>',
-            remove_figure_para, section_xml, flags=re.DOTALL)
-        if fig_count:
-            print(f"Figure captions removed: {fig_count}")
+        # ── 4b. [Figure N] captions: kept for inject_images.py ─────
+        #   inject_images.py replaces [Figure N] paragraphs with <hp:pic>
+        #   image tags as a post-processing step in convert_mermaid.py.
 
         # ── 4c. Source/caption text: italic charPr ──────────────────
         #   "출처:", "자료:", "※", "주:" → italic 11pt 맑은고딕

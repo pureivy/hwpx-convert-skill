@@ -489,6 +489,17 @@ def main():
             except Exception as e:
                 print(f"WARNING: Final charPr cleanup failed: {e}")
 
+            # Post-processing: inject image XML references
+            # pypandoc-hwpx embeds images in BinData/ but fails to create
+            # <hp:pic> XML tags in section0.xml for complex documents.
+            # This replaces [Figure N] placeholder paragraphs with images.
+            try:
+                inject_mod = _load_module('inject_images',
+                                          'inject_images.py')
+                inject_mod.inject_images(output_hwpx)
+            except Exception as e:
+                print(f"WARNING: Image injection failed: {e}")
+
             size = os.path.getsize(output_hwpx)
             print(f"\n{'=' * 60}")
             print(f"Conversion complete!")

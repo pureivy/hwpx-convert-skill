@@ -294,14 +294,64 @@ def _build_grid_layout(nodes_order, node_defs, connections, styles, cols=2):
     return '\n'.join(result)
 
 
+def _fix_quadrant_korean(mermaid_code):
+    """Quote Korean text in quadrantChart to fix mmdc lexer errors."""
+    if not mermaid_code.strip().startswith('quadrantChart'):
+        return mermaid_code, False
+    lines = mermaid_code.split('\n')
+    fixed = []
+    changed = False
+    # Regex for CJK characters
+    has_cjk = re.compile(r'[\u3000-\u9fff\uac00-\ud7af]')
+    for line in lines:
+        stripped = line.strip()
+        if stripped == 'quadrantChart':
+            fixed.append(line)
+            continue
+        # title, x-axis, y-axis, quadrant-N: quote the value part
+        m = re.match(r'^(\s*)(title|x-axis|y-axis|quadrant-\d)\s+(.+)$',
+                     line)
+        if m and has_cjk.search(m.group(3)):
+            indent, key, val = m.group(1), m.group(2), m.group(3)
+            # Handle "A --> B" axis format
+            if '-->' in val and key in ('x-axis', 'y-axis'):
+                parts = val.split('-->')
+                parts = [f'"{p.strip()}"' if has_cjk.search(p)
+                         and not p.strip().startswith('"')
+                         else p.strip() for p in parts]
+                val = ' --> '.join(parts)
+            elif not val.startswith('"'):
+                val = f'"{val}"'
+            fixed.append(f'{indent}{key} {val}')
+            changed = True
+            continue
+        # Data points: "Label: [x, y]"
+        m = re.match(r'^(\s*)([^:\[]+):\s*(\[.+\])\s*$', line)
+        if m and has_cjk.search(m.group(2)):
+            indent, label, coords = m.group(1), m.group(2).strip(), m.group(3)
+            if not label.startswith('"'):
+                label = f'"{label}"'
+            fixed.append(f'{indent}{label}: {coords}')
+            changed = True
+            continue
+        fixed.append(line)
+    return '\n'.join(fixed), changed
+
+
 def _optimize_mermaid_for_portrait(mermaid_code):
     """
     Optimize mermaid code for A4 portrait:
+    0. quadrantChart Korean fix (quote CJK labels)
     1. \\n → <br/> in node labels
     2. graph LR → grid layout (subgraph rows + direction LR)
     """
     optimized = mermaid_code
     changed = []
+
+    # 0. quadrantChart Korean fix
+    optimized, qc_fixed = _fix_quadrant_korean(optimized)
+    if qc_fixed:
+        changed.append('quadrant-kr-fix')
 
     # 1. \n → <br/>
     def replace_newline_in_labels(m):
